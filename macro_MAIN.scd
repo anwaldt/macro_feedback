@@ -19,6 +19,7 @@ ServerMeter(s);
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
+
 (
 
 // s.boot;
@@ -29,15 +30,21 @@ SynthDef(\macro_micro,{
 	|
 	in_bus   = 0,
 	out_bus  = 0,
-	fb_gain  = 0,
+	main_fb  = 0,
+	gain_bus = 0,
 	fb_delay = 0.01
 	|
 
 	var in   = SoundIn.ar(in_bus);
 
-	var proc = DelayC.ar(in*fb_gain,1, fb_delay);
+	var proc = DelayC.ar(in,1,fb_delay);
 
-	Out.ar(out_bus, proc);
+	var g0,g1,g2,g3;
+
+	Out.ar(out_bus+0, main_fb* In.kr(gain_bus + 0,1) * proc);
+	Out.ar(out_bus+1, main_fb* In.kr(gain_bus + 1,1) * proc);
+	Out.ar(out_bus+2, main_fb* In.kr(gain_bus + 2,1) * proc);
+	Out.ar(out_bus+3, main_fb* In.kr(gain_bus + 3,1) * proc);
 
 }).send;
 
@@ -47,9 +54,9 @@ SynthDef(\macro_micro,{
 
 ~lfo_BUS = Bus.control(s,1);
 
-~fb_gain_BUS  = Bus.control(s,4);
+// ~fb_gain_BUS  = Bus.control(s,4);
 
-//~fb_gain_BUS  = Array.fill(4,Bus.control(s,4));
+~fb_gain_BUS  = Array.fill(4,{Bus.control(s,4)});
 
 
 ~fb_delay_BUS = Bus.control(s,4);
@@ -65,6 +72,7 @@ SynthDef(\macro_micro,{
 ~lfo.set(\mean,0.2)
 ~lfo.set(\depth,0.1)
 
+~fb_gain_BUS[0].scope
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -83,8 +91,9 @@ SynthDef(\macro_micro,{
 // output shifted to work with Scarlett 18i20
 ~mics = Array.fill(4, { arg i; Synth( \macro_micro,
 	[
-		\in_bus,  i,
-		\out_bus, 2 + ((i+1)%4)
+		\gain_bus, ~fb_gain_BUS[i],
+		\in_bus,   i,
+		\out_bus,  2 //+ ((i+1)%4)
 	]
 )});
 
@@ -97,7 +106,7 @@ SynthDef(\macro_micro,{
 
 (
 
-~mics.do({arg e,i; e.map(\fb_gain, ~fb_gain_BUS.index+i)});
+//~mics.do({arg e,i; e.map(\fb_gain, ~fb_gain_BUS.index+i)});
 ~mics.do({arg e,i; e.map(\fb_delay, ~lfo_BUS.index)});
 
 )
@@ -110,55 +119,73 @@ SynthDef(\macro_micro,{
 
 MIDIdef.cc(\gain0,
 
+	{ arg ... args;
+
+
+		var val = (1*(args[0] / 127));
+		var ctl = args[1];
+
+		args.postln;
+
+		switch(ctl,
+			16, {~fb_gain_BUS[0].setAt(0,val)},
+			17, {~fb_gain_BUS[0].setAt(2,val)},
+			20, {~fb_gain_BUS[0].setAt(1,val)},
+			21, {~fb_gain_BUS[0].setAt(3,val)},
+			//
+			nil
+		);
+
+
+		switch(ctl,
+			24, {~fb_gain_BUS[1].setAt(0,val)},
+			25, {~fb_gain_BUS[1].setAt(2,val)},
+			28, {~fb_gain_BUS[1].setAt(1,val)},
+			29, {~fb_gain_BUS[1].setAt(3,val)},
+			//
+			nil
+		);
+
+
+		switch(ctl,
+			46, {~fb_gain_BUS[2].setAt(0,val)},
+			47, {~fb_gain_BUS[2].setAt(2,val)},
+			50, {~fb_gain_BUS[2].setAt(1,val)},
+			51, {~fb_gain_BUS[2].setAt(3,val)},
+			//
+			nil
+		);
+
+		switch(ctl,
+			54, {~fb_gain_BUS[3].setAt(0,val)},
+			55, {~fb_gain_BUS[3].setAt(2,val)},
+			58, {~fb_gain_BUS[3].setAt(1,val)},
+			59, {~fb_gain_BUS[3].setAt(3,val)},
+			//
+			nil
+		);
+
+	//}, nil, nil, nil
+	}, [16,17,20,21, 24,25,28,29, 46,47,50,51, 54,55,58,59], nil, nil
+);
+
+
+
+MIDIdef.cc(\main_fb,
 	{
 		arg ... args;
 
-		var val;
-		val = (1*(args[0] / 127));
-		args.postln;
-
-		~fb_gain_BUS.setAt(0,val);
-	}, 16, nil, nil
-);
-
-MIDIdef.cc(\gain1,
-	{
-		arg ... args;
 
 		var val;
-		val = (1*(args[0] / 127));
-		args.postln;
+		val = pow((args[0] / 127),2);
 
-		~fb_gain_BUS.setAt(1,val);
-	}, 20, nil, nil
+		~mics.do({arg e; e.set(\main_fb,val)});
+
+		// args.postln;
+		val.postln;
+
+	}, 62, nil, nil
 );
-
-MIDIdef.cc(\gain2,
-	{
-		arg ... args;
-
-		var val;
-		val = (1*(args[0] / 127));
-		args.postln;
-
-		~fb_gain_BUS.setAt(2,val);
-	}, 24, nil, nil
-);
-
-MIDIdef.cc(\gain3,
-	{
-		arg ... args;
-
-		var val;
-		val = (1*(args[0] / 127));
-		args.postln;
-
-		~fb_gain_BUS.setAt(3,val);
-	}, 28, nil, nil
-);
-
-
-
 
 
 
