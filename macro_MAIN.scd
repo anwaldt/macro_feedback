@@ -49,44 +49,51 @@ SynthDef(\macro_micro,{
 }).send;
 
 
-~lfo_freq_BUS  = Bus.control(s,1);
-~lfo_depth_BUS = Bus.control(s,1);
+SynthDef(\macro_modulator, {
 
-~lfo_BUS = Bus.control(s,1);
+	|
+	freq  = 1,
+	mean  = 0.1,
+	depth = 0.01,
+	//
+	out_bus = nil
+	|
 
-// ~fb_gain_BUS  = Bus.control(s,4);
+	var mod = mean+(depth* (1 + SinOsc.kr(freq)) * 0.5);
 
+	Out.kr(out_bus, mod);
+
+}).send;
+
+
+~mod_BUS      = Bus.control(s,4);
 ~fb_gain_BUS  = Array.fill(4,{Bus.control(s,4)});
 
-
-~fb_delay_BUS = Bus.control(s,4);
-
-~lfo_BUS.scope;
 
 )
 
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
-~lfo.free
-~lfo.set(\mean,0.2)
-~lfo.set(\depth,0.1)
 
 ~fb_gain_BUS[0].scope
+
+~lfo_BUS.scope;
+
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
 (
 
-~lfo = { arg freq = 1, mean = 0.1, depth=0.01;
-
-	var mod = mean+(depth* (1+SinOsc.kr(freq)) * 0.5);
-
-	Out.kr(~lfo_BUS.index,mod);
-
-}.play;
-
+// ~lfo = { arg freq = 1, mean = 0.1, depth=0.01;
+//
+// 	var mod = mean+(depth* (1+SinOsc.kr(freq)) * 0.5);
+//
+// 	Out.kr(~lfo_BUS.index,mod);
+//
+// }.play;
+//
 
 // output shifted to work with Scarlett 18i20
 ~mics = Array.fill(4, { arg i; Synth( \macro_micro,
@@ -94,6 +101,13 @@ SynthDef(\macro_micro,{
 		\gain_bus, ~fb_gain_BUS[i],
 		\in_bus,   i,
 		\out_bus,  2 //+ ((i+1)%4)
+	]
+)});
+
+
+~modulators = Array.fill(4, { arg i; Synth( \macro_modulator,
+	[
+		\out_bus, ~mod_BUS.index+i
 	]
 )});
 
@@ -107,7 +121,7 @@ SynthDef(\macro_micro,{
 (
 
 //~mics.do({arg e,i; e.map(\fb_gain, ~fb_gain_BUS.index+i)});
-~mics.do({arg e,i; e.map(\fb_delay, ~lfo_BUS.index)});
+~mics.do({arg e,i; e.map(\fb_delay, ~mod_BUS.index+i)});
 
 )
 
@@ -117,6 +131,14 @@ SynthDef(\macro_micro,{
 
 (
 
+MIDIdef.cc(\post,
+
+	{ arg ... args;
+
+		args.postln;
+	}
+);
+
 MIDIdef.cc(\gain0,
 
 	{ arg ... args;
@@ -125,7 +147,7 @@ MIDIdef.cc(\gain0,
 		var val = (1*(args[0] / 127));
 		var ctl = args[1];
 
-		args.postln;
+		val.postln;
 
 		switch(ctl,
 			16, {~fb_gain_BUS[0].setAt(0,val)},
@@ -165,7 +187,7 @@ MIDIdef.cc(\gain0,
 			nil
 		);
 
-	//}, nil, nil, nil
+		//}, nil, nil, nil
 	}, [16,17,20,21, 24,25,28,29, 46,47,50,51, 54,55,58,59], nil, nil
 );
 
@@ -193,31 +215,19 @@ MIDIdef.cc(\delay,
 	{
 		arg ... args;
 
-		var val;
-		val = pow((args[0] / 127),2);
+		var ctl = args[1];
+		var val = pow((args[0] / 127),2);
 
-		~lfo.set(\mean,val);
+		switch(ctl,
+			18, {~modulators[0].set(\mean,val)},
+			26, {~modulators[1].set(\mean,val)},
+			48, {~modulators[2].set(\mean,val)},
+			56, {~modulators[3].set(\mean,val)}
+		);
 
-		val.postln;
-		// ~fb_delay_BUS.setAll(val);
-
-	}, 23, nil, nil
+	}, [18, 26, 48, 56], nil, nil
 );
 
-MIDIdef.cc(\depth,
-	{
-		arg ... args;
-
-		var val;
-		val = pow((args[0] / 127),2);
-
-		~lfo.set(\depth,val);
-
-		val.postln;
-		// ~fb_delay_BUS.setAll(val);
-
-	}, 27, nil, nil
-);
 
 
 MIDIdef.cc(\freq,
@@ -235,6 +245,22 @@ MIDIdef.cc(\freq,
 	}, 31, nil, nil
 );
 
+
+
+MIDIdef.cc(\depth,
+	{
+		arg ... args;
+
+		var val;
+		val = pow((args[0] / 127),2);
+
+		~lfo.set(\depth,val);
+
+		val.postln;
+		// ~fb_delay_BUS.setAll(val);
+
+	}, 27, nil, nil
+);
 
 
 )
