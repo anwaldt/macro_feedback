@@ -33,7 +33,7 @@ s.waitForBoot(
 
 				var in   = SoundIn.ar(in_bus);
 
-				var proc = DelayC.ar(in,1,Lag.kr(fb_delay,0.05));
+				var proc = in;
 
 				var g0,g1,g2,g3;
 
@@ -75,21 +75,27 @@ s.waitForBoot(
 				g1 = 0.5,
 				g2 = 0.5,
 				g3 = 0,
-				g4 = 0
+				g4 = 0,
+				//
+				fb_delay    = 0.01,
+				delay_scale = 1
 				|
 
+				var proc;
 				var in = In.ar(in_bus,1);
 
 				in = LPF.ar(HPF.ar(in,hp_cutoff),lp_cutoff);
 
+				proc = DelayC.ar(in,1,Lag.kr(delay_scale*fb_delay,0.05));
+
 				// one feedback output
-				Out.ar(feedback_out, in);
+				Out.ar(feedback_out, proc);
 
 				// four speaker outputs
-				Out.ar(speaker_out+0, g1*in);
-				Out.ar(speaker_out+1, g2*in);
-				Out.ar(speaker_out+2, g3*in);
-				Out.ar(speaker_out+3, g4*in);
+				Out.ar(speaker_out+0, g1*proc);
+				Out.ar(speaker_out+1, g2*proc);
+				Out.ar(speaker_out+2, g3*proc);
+				Out.ar(speaker_out+3, g4*proc);
 
 			}).send;
 
@@ -139,7 +145,7 @@ s.waitForBoot(
 				e.set(\g1,i/3, \g2,1-(i/3))});
 
 			//~mics.do({arg e,i; e.map(\fb_gain, ~fb_gain_BUS.index+i)});
-			~mics.do({arg e,i; e.map(\fb_delay, ~mod_BUS.index+i)});
+			~outputs.do({arg e,i; e.map(\fb_delay, ~mod_BUS.index+i)});
 
 
 
@@ -147,13 +153,15 @@ s.waitForBoot(
 			////////////////////////////////////////////////////////////////////////////////
 
 
-			/*MIDIdef.cc(\post,
+			/*
+			MIDIdef.cc(\post,
 
-				{ arg ... args;
+			{ arg ... args;
 
-					args.postln;
-				}
-			);*/
+			args.postln;
+			}
+			);
+			*/
 
 			MIDIdef.cc(\gain0,
 
@@ -243,7 +251,7 @@ s.waitForBoot(
 					);
 
 
-				('Delay: '++ctl.asString++' = '++val.asString).postln;
+					('Delay: '++ctl.asString++' = '++val.asString).postln;
 
 
 				}, [18, 26, 48, 56], nil, nil
@@ -281,6 +289,19 @@ s.waitForBoot(
 				}, 27, nil, nil
 			);
 
+			MIDIdef.cc(\del_scale,
+				{ arg ... args;
+
+					var val;
+					val = pow((args[0] / 127),2);
+
+					~outputs.do({arg e,i; e.set(\delay_scale,val)});
+
+					('Delay scale: '++val.asString).postln;
+
+				}, 61, nil, nil
+			);
+
 
 
 			MIDIdef.cc(\lp,
@@ -293,7 +314,7 @@ s.waitForBoot(
 
 					('LP: '++val.asString).postln;
 
-				}, 57, nil, nil
+				}, 53, nil, nil
 			);
 
 
@@ -308,7 +329,7 @@ s.waitForBoot(
 
 					('HP: '++val.asString).postln;
 
-				}, 61, nil, nil
+				}, 57, nil, nil
 			);
 
 
